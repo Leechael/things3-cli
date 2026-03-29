@@ -169,6 +169,7 @@ func statusSymbol(status string) string {
 func printToDo(w io.Writer, item model.ToDo) {
 	fmt.Fprintf(w, "%s %s\n", statusSymbol(item.Status), item.Title)
 	fmt.Fprintln(w, item.ID)
+	fmt.Fprintf(w, "things:///show?id=%s\n", item.ID)
 
 	var ctx []string
 	if item.Area != "" {
@@ -281,6 +282,7 @@ func (f *Formatter) printHuman(w io.Writer, data interface{}) error {
 
 	case *model.ToDo:
 		fmt.Fprintf(tw, "id\t%s\n", value.ID)
+		fmt.Fprintf(tw, "url\tthings:///show?id=%s\n", value.ID)
 		fmt.Fprintf(tw, "title\t%s\n", value.Title)
 		fmt.Fprintf(tw, "status\t%s\n", value.Status)
 		if s := value.StartDateOrStart(); s != "" {
