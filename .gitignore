@@ -1,2 +1,34 @@
-data/
+# Binaries
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/dist/
+
+# Test
+*.test
+*.out
+coverage.txt
+
+# Dependency
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.env.local
+
+# Local project data
+/data/
 docs/*_zh.md
