@@ -23,6 +23,10 @@ func newAreaCmd() *cobra.Command {
 	return cmd
 }
 
+func newLSAreasCmd() *cobra.Command {
+	return newAreaListCommand("ls-areas", "List areas", nil)
+}
+
 func newAreaCreateCmd() *cobra.Command {
 	params := client.CreateAreaParams{}
 
@@ -57,12 +61,16 @@ func newAreaCreateCmd() *cobra.Command {
 }
 
 func newAreaListCmd() *cobra.Command {
+	return newAreaListCommand("list", "List areas", []string{"ls"})
+}
+
+func newAreaListCommand(use string, short string, aliases []string) *cobra.Command {
 	params := client.ListAreaParams{}
 
 	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List areas",
-		Aliases: []string{"ls"},
+		Use:     use,
+		Short:   short,
+		Aliases: aliases,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := getClient(cmd)
 			if err != nil {

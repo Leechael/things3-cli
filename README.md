@@ -60,6 +60,8 @@ It also provides `inbox` / `today` / `upcoming` / `anytime` / `someday` as commo
 
 ### Project operations
 
+- `ls-projects` (default: incomplete projects only)
+- `ls-projects --all` (show all projects across statuses)
 - `projects create`
 - `projects list` (`ls`) / `projects get <id>`
 - `projects update --id <id> ...`
@@ -67,6 +69,7 @@ It also provides `inbox` / `today` / `upcoming` / `anytime` / `someday` as commo
 
 ### Area CRUD
 
+- `ls-areas`
 - `areas create --name <name> [--tags "Tag1,Tag2"]` (via AppleScript)
 - `areas list` (`ls`) / `areas get <id>`
 - `areas update --id <id>|--name <name> [--new-name <name>] [--tags "Tag1,Tag2"]` (via AppleScript)
@@ -120,7 +123,8 @@ things3-cli projects delete --id "project-uuid"
 
 # Project creation and reading
 things3-cli add-project --title "Plan trip" --area "Personal"
-things3-cli projects list --json --jq '.results[].title'
+things3-cli ls-projects --json --jq '.results[].title'
+things3-cli ls-projects --all --json
 
 # Tag CRUD (via AppleScript)
 things3-cli tags create --name "Errand"

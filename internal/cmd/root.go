@@ -89,8 +89,14 @@ func NewRootCmd() *cobra.Command {
 	deleteTodoCmd := newDeleteTodoCmd()
 	deleteTodoCmd.GroupID = "todos"
 
+	lsProjectsCmd := newLSProjectsCmd()
+	lsProjectsCmd.GroupID = "projects"
+
 	projectsCmd := newProjectCmd()
 	projectsCmd.GroupID = "projects"
+
+	lsAreasCmd := newLSAreasCmd()
+	lsAreasCmd.GroupID = "areas"
 
 	areasCmd := newAreaCmd()
 	areasCmd.GroupID = "areas"
@@ -141,7 +147,9 @@ func NewRootCmd() *cobra.Command {
 		getTodoCmd,
 		updateTodoCmd,
 		deleteTodoCmd,
+		lsProjectsCmd,
 		projectsCmd,
+		lsAreasCmd,
 		areasCmd,
 		tagCmd,
 		showCmd,

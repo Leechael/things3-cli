@@ -11,7 +11,7 @@ The CLI uses two backends: SQLite for all read operations, and the Things URL Sc
 ## Commands
 
     things3-cli add-todo --title <title> [flags]          Create a to-do
-    things3-cli ls [filters]                              List to-dos (all)
+    things3-cli ls-todo [filters]                         List to-dos (full filters)
     things3-cli inbox [filters]                           List Inbox to-dos
     things3-cli today [filters]                           List Today to-dos
     things3-cli upcoming [filters]                        List Upcoming to-dos
@@ -37,7 +37,7 @@ The CLI uses two backends: SQLite for all read operations, and the Things URL Sc
     things3-cli today --json
 
     # Filter by tag and extract titles with jq
-    things3-cli ls --tags "work" --json --jq '.[].title'
+    things3-cli ls-todo --tags "work,focused" --json --jq '.[].title'
 
     # Update scheduling
     things3-cli update-todo --id <uuid> --when tomorrow

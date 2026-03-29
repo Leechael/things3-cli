@@ -10,9 +10,10 @@ Because the URL Scheme has no area management endpoints, this CLI implements are
 
 ## Commands
 
+    things3-cli ls-areas [filters]                               List areas
     things3-cli areas create --name <name> [--tags "t1,t2"]      Create an area
-    things3-cli areas list|ls [filters]                          List areas
-    things3-cli areas get <id>                                   Get an area by UUID
+    things3-cli areas list|ls [filters]                           List areas
+    things3-cli areas get <id>                                    Get an area by UUID
     things3-cli areas update --id <id>|--name <name> [flags]     Update an area
     things3-cli areas delete --id <id>|--name <name>             Delete an area
 
@@ -28,7 +29,7 @@ Because the URL Scheme has no area management endpoints, this CLI implements are
     things3-cli areas create --name "Work"
 
     # List areas as JSON
-    things3-cli areas list --json
+    things3-cli ls-areas --json
 
     # Rename an area
     things3-cli areas update --name "Work" --new-name "Day Job"

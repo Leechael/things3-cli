@@ -23,14 +23,32 @@ func newProjectCmd() *cobra.Command {
 	return cmd
 }
 
+func newLSProjectsCmd() *cobra.Command {
+	return newProjectListCommand("ls-projects", "List projects (default: incomplete only)", nil, true, true)
+}
+
 func newProjectListCmd() *cobra.Command {
+	return newProjectListCommand("list", "List projects", []string{"ls"}, false, false)
+}
+
+func newProjectListCommand(use string, short string, aliases []string, defaultIncomplete bool, exposeAllFlag bool) *cobra.Command {
 	params := client.ListProjectParams{}
+	var all bool
 
 	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List projects",
-		Aliases: []string{"ls"},
+		Use:     use,
+		Short:   short,
+		Aliases: aliases,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if exposeAllFlag && all {
+				if cmd.Flags().Changed("status") {
+					return fmt.Errorf("--all and --status are mutually exclusive")
+				}
+				params.Status = ""
+			} else if defaultIncomplete && !cmd.Flags().Changed("status") {
+				params.Status = "incomplete"
+			}
+
 			c, err := getClient(cmd)
 			if err != nil {
 				return err
@@ -50,6 +68,9 @@ func newProjectListCmd() *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.StringVar(&params.Status, "status", "", "Filter by status: incomplete|completed|canceled")
+	if exposeAllFlag {
+		flags.BoolVar(&all, "all", false, "Show all statuses (overrides default incomplete filter)")
+	}
 	flags.StringVar(&params.AreaID, "area-id", "", "Filter by area UUID")
 	flags.StringVar(&params.Search, "search", "", "Search in title and notes")
 	flags.BoolVar(&params.IncludeTrashed, "include-trashed", false, "Include trashed projects")

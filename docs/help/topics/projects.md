@@ -10,6 +10,8 @@ Use a project when the work has a clear completion criteria. Use an area when th
 
 ## Commands
 
+    things3-cli ls-projects [filters]                        List incomplete projects (default)
+    things3-cli ls-projects --all [filters]                  List all projects
     things3-cli projects create --title <title> [flags]      Create a project
     things3-cli projects list|ls [filters]                   List projects
     things3-cli projects get <id>                            Get a project by UUID
@@ -28,8 +30,11 @@ Use a project when the work has a clear completion criteria. Use an area when th
     # Create a project in an area
     things3-cli projects create --title "Website Relaunch" --area "Work"
 
+    # List incomplete projects as JSON
+    things3-cli ls-projects --json
+
     # List all projects as JSON
-    things3-cli projects list --json
+    things3-cli ls-projects --all --json
 
     # Get a specific project
     things3-cli projects get <uuid>
