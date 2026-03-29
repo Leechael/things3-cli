@@ -66,7 +66,7 @@ func newTodoListCommand(use string, short string, aliases []string) *cobra.Comma
 	flags.StringVar(&params.AreaName, "area", "", "Filter by area name")
 	flags.StringVar(&params.HeadingID, "heading-id", "", "Filter by heading UUID")
 	flags.StringVar(&params.Tag, "tag", "", "Filter by one tag title")
-	flags.StringVar(&params.Tags, "tags", "", "Filter by multiple tag titles (comma-separated)")
+	flags.StringVar(&params.Tags, "tags", "", "Filter by multiple tag titles (comma-separated, AND match)")
 	flags.StringVar(&params.Search, "search", "", "Search in title and notes")
 	flags.BoolVar(&params.IncludeTrashed, "include-trashed", false, "Include trashed items")
 	flags.IntVar(&params.Limit, "limit", 200, "Maximum number of results")

@@ -72,8 +72,9 @@ func TestListToDosFromSQLite(t *testing.T) {
 	if got := resp.Results[0].Title; got != "Buy milk" {
 		t.Fatalf("unexpected title: %s", got)
 	}
-	if got := strings.Join(resp.Results[0].Tags, ","); got != "Errand" {
-		t.Fatalf("unexpected tags: %s", got)
+	tags := resp.Results[0].Tags
+	if len(tags) != 2 || !containsString(tags, "Errand") || !containsString(tags, "Important") {
+		t.Fatalf("unexpected tags: %#v", tags)
 	}
 	if got := resp.Results[0].Project; got != "Home" {
 		t.Fatalf("unexpected project: %s", got)
@@ -102,7 +103,7 @@ func TestUpdateRequiresToken(t *testing.T) {
 	}
 }
 
-func TestListToDosFiltersByNameAndMultipleTags(t *testing.T) {
+func TestListToDosFiltersByNameAndMultipleTagsAND(t *testing.T) {
 	t.Parallel()
 
 	dbPath := setupTestDB(t)
@@ -111,17 +112,30 @@ func TestListToDosFiltersByNameAndMultipleTags(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	resp, err := c.ListToDos(ListToDoParams{
+	matched, err := c.ListToDos(ListToDoParams{
+		ProjectName: "Home",
+		AreaName:    "Personal",
+		Tags:        "Errand,Important",
+		Limit:       10,
+	})
+	if err != nil {
+		t.Fatalf("list todos with matching tags: %v", err)
+	}
+	if matched.Count != 1 {
+		t.Fatalf("expected 1 todo for AND match, got %d", matched.Count)
+	}
+
+	notMatched, err := c.ListToDos(ListToDoParams{
 		ProjectName: "Home",
 		AreaName:    "Personal",
 		Tags:        "Errand,NotExists",
 		Limit:       10,
 	})
 	if err != nil {
-		t.Fatalf("list todos with filters: %v", err)
+		t.Fatalf("list todos with non-matching tags: %v", err)
 	}
-	if resp.Count != 1 {
-		t.Fatalf("expected 1 todo, got %d", resp.Count)
+	if notMatched.Count != 0 {
+		t.Fatalf("expected 0 todos for AND mismatch, got %d", notMatched.Count)
 	}
 }
 
@@ -288,6 +302,15 @@ func TestDeleteTagByIDUsesSQLiteLookup(t *testing.T) {
 	}
 }
 
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func setupTestDB(t *testing.T) string {
 	t.Helper()
 
@@ -334,11 +357,13 @@ func setupTestDB(t *testing.T) string {
 		`INSERT INTO Meta(key, value) VALUES('databaseVersion', '26');`,
 		`INSERT INTO TMArea(uuid, title, "index") VALUES('area-1', 'Personal', 1);`,
 		`INSERT INTO TMTag(uuid, title, shortcut, parent, "index") VALUES('tag-1', 'Errand', '', '', 1);`,
+		`INSERT INTO TMTag(uuid, title, shortcut, parent, "index") VALUES('tag-2', 'Important', '', '', 2);`,
 		`INSERT INTO TMTask(uuid, type, title, notes, status, start, startDate, deadline, project, area, heading, trashed, rt1_recurrenceRule, "index", untrashedLeafActionsCount, openUntrashedLeafActionsCount)
 		 VALUES('project-1', 1, 'Home', '', 0, 1, NULL, NULL, NULL, 'area-1', NULL, 0, NULL, 1, 2, 1);`,
 		`INSERT INTO TMTask(uuid, type, title, notes, status, start, startDate, deadline, project, area, heading, trashed, rt1_recurrenceRule, "index", untrashedLeafActionsCount, openUntrashedLeafActionsCount)
 		 VALUES('todo-1', 0, 'Buy milk', '2 liters', 0, 0, NULL, NULL, 'project-1', 'area-1', NULL, 0, NULL, 2, 0, 0);`,
 		`INSERT INTO TMTaskTag(tasks, tags) VALUES('todo-1', 'tag-1');`,
+		`INSERT INTO TMTaskTag(tasks, tags) VALUES('todo-1', 'tag-2');`,
 	}
 
 	for _, stmt := range inserts {

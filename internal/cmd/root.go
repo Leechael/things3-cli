@@ -370,7 +370,7 @@ Key best practices
 1) Prefer ID-based operations for reliability.
 2) Use --json (+ --jq) in automation scripts.
 3) ls/add-todo support project/area by name directly.
-4) For tag filters in ls, use --tags with comma-separated names.
+4) For tag filters in ls, use --tags with comma-separated names (AND match).
 5) Keep reads from SQLite and writes from URL Scheme/AppleScript.
 
 Important constraints (from local docs + Things docs)

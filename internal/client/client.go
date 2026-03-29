@@ -252,18 +252,16 @@ WHERE t.type = 0
 	if params.Tag != "" {
 		tagFilters = append(tagFilters, params.Tag)
 	}
-	if len(tagFilters) > 0 {
-		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(tagFilters)), ",")
+	tagFilters = uniqueStrings(tagFilters)
+	for _, tagName := range tagFilters {
 		query.WriteString(`
   AND EXISTS (
     SELECT 1
     FROM TMTaskTag ft
     JOIN TMTag ftag ON ftag.uuid = ft.tags
-    WHERE ft.tasks = t.uuid AND ftag.title IN (` + placeholders + `)
+    WHERE ft.tasks = t.uuid AND ftag.title = ?
   )`)
-		for _, tagName := range tagFilters {
-			args = append(args, tagName)
-		}
+		args = append(args, tagName)
 	}
 	if params.Search != "" {
 		query.WriteString(" AND (t.title LIKE ? OR t.notes LIKE ?)")
@@ -1471,6 +1469,22 @@ func splitCommaValues(raw string) []string {
 		return nil
 	}
 	return values
+}
+
+func uniqueStrings(values []string) []string {
+	if len(values) <= 1 {
+		return values
+	}
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 func appleScriptString(value string) string {

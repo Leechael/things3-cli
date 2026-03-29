@@ -55,7 +55,7 @@ things3-cli status --json
 - `update-todo --id <id> ...`（update）
 - `delete-todo --id <id>|--name <title>`（delete，AppleScript）
 
-`add-todo` 与 `ls` 支持直接按名称输入 `project` / `area`，并支持 `--tags` 多标签（逗号分隔）。
+`add-todo` 与 `ls` 支持直接按名称输入 `project` / `area`，并支持 `--tags` 多标签（逗号分隔；`ls` 为 AND 匹配）。
 
 ### Project operations
 
