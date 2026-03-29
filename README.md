@@ -5,7 +5,7 @@
 - Read: Local SQLite (read-only)
 - Write: Things URL Scheme (`add` / `update` / `show` / `search` / `json`, etc.)
 
-Implementation basis: capability matrix and URL semantic constraints in `docs/*_zh.md`.
+Implementation basis: capability matrix and URL semantic constraints in `docs/*.md`.
 
 ## Install
 
