@@ -1,12 +1,10 @@
 # Todos
 
-To-dos are the core actionable items in Things; reads use SQLite, writes use URL Scheme, deletes use AppleScript.
+To-dos are the core actionable items in Things.
 
 ## Overview
 
 A to-do represents a single task with an optional title, notes, deadline, tags, checklist items, and scheduling (when). To-dos belong to a project, an area, or sit in the Inbox if unassigned.
-
-The CLI uses two backends: SQLite for all read operations, and the Things URL Scheme for create and update. Delete requires AppleScript. This split means some operations are constrained by what the URL Scheme supports — see Constraints below.
 
 ## Commands
 
@@ -23,10 +21,10 @@ The CLI uses two backends: SQLite for all read operations, and the Things URL Sc
 
 ## Constraints
 
-- URL Scheme cannot delete to-dos. Delete uses AppleScript and requires macOS + Things running.
+- Delete requires macOS and Things to be running.
 - Repeating to-dos have limited update support: when, deadline, and completed fields may not behave as expected. Prefer editing repeating to-dos in the Things UI.
-- Checklist item editing is not supported by URL Scheme. Use --checklist-items to replace the entire checklist.
-- Reads (ls, get-todo) query SQLite directly. Writes (add-todo, update-todo) go through URL Scheme. There is a brief eventual-consistency window after Things processes the URL before the new data appears in reads.
+- Checklist items cannot be edited individually. Use --checklist-items to replace the full list.
+- After a create or update, there is a brief delay before the change appears in list and get results.
 
 ## Examples
 
@@ -50,5 +48,3 @@ The CLI uses two backends: SQLite for all read operations, and the Things URL Sc
 - things3-cli help projects
 - things3-cli help areas
 - things3-cli help tags
-- things3-cli help url-scheme
-- things3-cli help applescript

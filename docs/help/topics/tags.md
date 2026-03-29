@@ -1,12 +1,12 @@
 # Tags
 
-Tags are cross-cutting context labels that support a shallow parent-child hierarchy; tag definition management uses AppleScript.
+Tags are cross-cutting context labels that support a shallow parent-child hierarchy.
 
 ## Overview
 
 A tag in Things is a context label that can be applied to any to-do or project regardless of area or project membership. Tags support one level of parent-child hierarchy — a tag can have a parent tag, enabling grouping like Work > Deep Work or Personal > Health.
 
-The URL Scheme can reference existing tags on to-dos and projects but cannot create, rename, or delete tag definitions. This CLI implements tag definition management via AppleScript.
+Tag create, update, and delete require macOS and Things to be running.
 
 ## Commands
 
@@ -18,8 +18,7 @@ The URL Scheme can reference existing tags on to-dos and projects but cannot cre
 
 ## Constraints
 
-- Tag definition operations (create, update, delete) use AppleScript and require macOS + Things running.
-- URL Scheme can only apply existing tags to to-dos/projects. It cannot create new tag definitions.
+- Create, update, and delete require macOS and Things to be running.
 - Tag hierarchy is limited to one level. A child tag cannot have its own children.
 - Deleting a parent tag does not delete its child tags. Children become top-level tags.
 
@@ -37,10 +36,9 @@ The URL Scheme can reference existing tags on to-dos and projects but cannot cre
     # Rename a tag
     things3-cli tags update --name "deep-work" --new-name "focused"
 
-    # Apply existing tags when creating a to-do (URL Scheme)
+    # Apply tags when creating a to-do
     things3-cli add-todo --title "Write report" --tags "work,focused"
 
 ## Related Topics
 
 - things3-cli help todos
-- things3-cli help applescript

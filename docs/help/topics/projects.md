@@ -1,6 +1,6 @@
 # Projects
 
-A project groups related to-dos toward a defined outcome; create/update use URL Scheme, delete uses AppleScript.
+A project groups related to-dos toward a defined outcome.
 
 ## Overview
 
@@ -20,10 +20,10 @@ Use a project when the work has a clear completion criteria. Use an area when th
 
 ## Constraints
 
-- URL Scheme cannot delete projects. Delete uses AppleScript and requires macOS + Things running.
-- update-project cannot append child to-dos directly. Add to-dos to a project via add-todo --project.
-- Heading management (create/reorder headings) is not supported by URL Scheme. Use Shortcuts Actions for heading operations.
-- Completing or canceling a project via update-project does not automatically complete its open to-dos. Handle to-do state separately.
+- Delete requires macOS and Things to be running.
+- To-dos cannot be added to a project via update. Use `add-todo --project` instead.
+- Heading management (create/reorder) is not supported by this CLI. Use Things Shortcuts Actions for heading operations.
+- Completing or canceling a project does not automatically complete its open to-dos. Handle to-do state separately.
 
 ## Examples
 
@@ -50,5 +50,3 @@ Use a project when the work has a clear completion criteria. Use an area when th
 - things3-cli help project-vs-area
 - things3-cli help areas
 - things3-cli help todos
-- things3-cli help url-scheme
-- things3-cli help applescript

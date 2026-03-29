@@ -17,7 +17,7 @@ A simple test: can you imagine finishing it? If yes, it is a project. If it just
 - Projects can be completed or canceled via `projects update --completed` or `--canceled`. Areas have no such state.
 - A to-do can belong to a project OR an area, not both. Assigning to a project takes precedence.
 - Projects can be nested inside areas, but projects cannot be nested inside other projects (Things does not support sub-projects).
-- Area write operations require AppleScript; project write operations use URL Scheme. See the respective help topics for runtime requirements.
+- Area create/update/delete require macOS and Things to be running.
 
 ## Examples
 
