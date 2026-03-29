@@ -59,7 +59,7 @@ func TestFormatterPlainList(t *testing.T) {
 	}
 }
 
-func TestFormatterTagListGroupedByParent(t *testing.T) {
+func TestFormatterTagListTree(t *testing.T) {
 	t.Parallel()
 
 	formatter, err := New(false, false, "")
@@ -68,10 +68,11 @@ func TestFormatterTagListGroupedByParent(t *testing.T) {
 	}
 
 	payload := &model.PaginatedResponse[model.Tag]{
-		Count: 3,
+		Count: 4,
 		Results: []model.Tag{
-			{ID: "tag-1", Name: "Errand", Parent: "Context"},
-			{ID: "tag-2", Name: "Home", Parent: "Places"},
+			{ID: "ctx-1", Name: "Context"},
+			{ID: "tag-1", Name: "Errand", ParentID: "ctx-1", Parent: "Context"},
+			{ID: "tag-2", Name: "Home", ParentID: "ctx-1", Parent: "Context"},
 			{ID: "tag-3", Name: "Untagged"},
 		},
 	}
@@ -82,7 +83,14 @@ func TestFormatterTagListGroupedByParent(t *testing.T) {
 	}
 
 	got := out.String()
-	if !strings.Contains(got, "[Context]") || !strings.Contains(got, "[Places]") || !strings.Contains(got, "[(root)]") {
-		t.Fatalf("expected grouped parent sections, got: %q", got)
+	// Root tags appear at column 0; children indented with two spaces
+	if !strings.Contains(got, "[ctx-1] Context") {
+		t.Fatalf("expected root tag line, got: %q", got)
+	}
+	if !strings.Contains(got, "  [tag-1] Errand") {
+		t.Fatalf("expected indented child tag, got: %q", got)
+	}
+	if !strings.Contains(got, "[tag-3] Untagged") {
+		t.Fatalf("expected root tag line for Untagged, got: %q", got)
 	}
 }

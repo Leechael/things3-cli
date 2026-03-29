@@ -168,6 +168,7 @@ func statusSymbol(status string) string {
 
 func printToDo(w io.Writer, item model.ToDo) {
 	fmt.Fprintf(w, "%s %s\n", statusSymbol(item.Status), item.Title)
+	fmt.Fprintln(w, item.ID)
 
 	var ctx []string
 	if item.Area != "" {
@@ -198,6 +199,7 @@ func printToDo(w io.Writer, item model.ToDo) {
 
 func printProject(w io.Writer, item model.Project) {
 	fmt.Fprintf(w, "%s %s\n", statusSymbol(item.Status), item.Title)
+	fmt.Fprintln(w, item.ID)
 
 	var ctx []string
 	if item.Area != "" {
@@ -214,6 +216,30 @@ func printProject(w io.Writer, item model.Project) {
 		fmt.Fprintf(w, "Deadline: %s; %s - %s\n", item.Deadline, item.StartDate, item.Deadline)
 	} else if item.Deadline != "" {
 		fmt.Fprintf(w, "Deadline: %s\n", item.Deadline)
+	}
+}
+
+func printTagTree(w io.Writer, tags []model.Tag) {
+	byParent := make(map[string][]model.Tag)
+	for _, tag := range tags {
+		byParent[tag.ParentID] = append(byParent[tag.ParentID], tag)
+	}
+
+	var printNode func(tag model.Tag, depth int)
+	printNode = func(tag model.Tag, depth int) {
+		indent := strings.Repeat("  ", depth)
+		if tag.Shortcut != "" {
+			fmt.Fprintf(w, "%s[%s] %s  (%s)\n", indent, tag.ID, tag.Name, tag.Shortcut)
+		} else {
+			fmt.Fprintf(w, "%s[%s] %s\n", indent, tag.ID, tag.Name)
+		}
+		for _, child := range byParent[tag.ID] {
+			printNode(child, depth+1)
+		}
+	}
+
+	for _, root := range byParent[""] {
+		printNode(root, 0)
 	}
 }
 
@@ -308,6 +334,10 @@ func (f *Formatter) printHuman(w io.Writer, data interface{}) error {
 			}
 			printToDo(w, item)
 		}
+		if len(value.Results) > 0 {
+			fmt.Fprintln(w)
+			fmt.Fprintln(w, "Use \"things3-cli get-todo <id>\" for details.")
+		}
 		return nil
 
 	case *model.PaginatedResponse[model.Project]:
@@ -317,6 +347,10 @@ func (f *Formatter) printHuman(w io.Writer, data interface{}) error {
 			}
 			printProject(w, item)
 		}
+		if len(value.Results) > 0 {
+			fmt.Fprintln(w)
+			fmt.Fprintln(w, "Use \"things3-cli projects get <id>\" for details.")
+		}
 		return nil
 
 	case *model.PaginatedResponse[model.Area]:
@@ -324,32 +358,22 @@ func (f *Formatter) printHuman(w io.Writer, data interface{}) error {
 			if i > 0 {
 				fmt.Fprintln(w)
 			}
-			fmt.Fprintln(w, item.Name)
+			fmt.Fprintf(w, "[%s] %s\n", item.ID, item.Name)
 			if len(item.Tags) > 0 {
 				fmt.Fprintf(w, "Tags: %s\n", strings.Join(item.Tags, " | "))
 			}
 		}
+		if len(value.Results) > 0 {
+			fmt.Fprintln(w)
+			fmt.Fprintln(w, "Use \"things3-cli areas get <id>\" for details.")
+		}
 		return nil
 
 	case *model.PaginatedResponse[model.Tag]:
-		currentParent := ""
-		for index, item := range value.Results {
-			parent := item.Parent
-			if parent == "" {
-				parent = "(root)"
-			}
-			if index == 0 || parent != currentParent {
-				if index > 0 {
-					fmt.Fprintln(w)
-				}
-				fmt.Fprintf(w, "[%s]\n", parent)
-				currentParent = parent
-			}
-			if item.Shortcut != "" {
-				fmt.Fprintf(w, "%s  (%s)\n", item.Name, item.Shortcut)
-			} else {
-				fmt.Fprintln(w, item.Name)
-			}
+		printTagTree(w, value.Results)
+		if len(value.Results) > 0 {
+			fmt.Fprintln(w)
+			fmt.Fprintln(w, "Use \"things3-cli tags get <id>\" for details.")
 		}
 		return nil
 
