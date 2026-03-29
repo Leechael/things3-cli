@@ -155,8 +155,70 @@ func (f *Formatter) printPlain(w io.Writer, data interface{}) error {
 	return tw.Flush()
 }
 
-// printHuman outputs a compact, readable view focused on what matters.
-// No IDs. Single items use key-value format. Lists use minimal columns.
+func statusSymbol(status string) string {
+	switch status {
+	case "completed":
+		return "[x]"
+	case "canceled":
+		return "[-]"
+	default:
+		return "[ ]"
+	}
+}
+
+func printToDo(w io.Writer, item model.ToDo) {
+	fmt.Fprintf(w, "%s %s\n", statusSymbol(item.Status), item.Title)
+
+	var ctx []string
+	if item.Area != "" {
+		ctx = append(ctx, "Area: "+item.Area)
+	}
+	if item.Project != "" {
+		ctx = append(ctx, "Project: "+item.Project)
+	}
+	if len(ctx) > 0 {
+		fmt.Fprintln(w, strings.Join(ctx, "  |  "))
+	}
+
+	if len(item.Tags) > 0 {
+		fmt.Fprintf(w, "Tags: %s\n", strings.Join(item.Tags, " | "))
+	}
+
+	start := item.StartDateOrStart()
+	if item.Deadline != "" || start != "" {
+		if item.Deadline != "" && start != "" {
+			fmt.Fprintf(w, "Deadline: %s; %s - %s\n", item.Deadline, start, item.Deadline)
+		} else if item.Deadline != "" {
+			fmt.Fprintf(w, "Deadline: %s\n", item.Deadline)
+		} else {
+			fmt.Fprintf(w, "Start: %s\n", start)
+		}
+	}
+}
+
+func printProject(w io.Writer, item model.Project) {
+	fmt.Fprintf(w, "%s %s\n", statusSymbol(item.Status), item.Title)
+
+	var ctx []string
+	if item.Area != "" {
+		ctx = append(ctx, "Area: "+item.Area)
+	}
+	ctx = append(ctx, fmt.Sprintf("Tasks: %d/%d", item.OpenTaskCount, item.TaskCount))
+	fmt.Fprintln(w, strings.Join(ctx, "  |  "))
+
+	if len(item.Tags) > 0 {
+		fmt.Fprintf(w, "Tags: %s\n", strings.Join(item.Tags, " | "))
+	}
+
+	if item.Deadline != "" && item.StartDate != "" {
+		fmt.Fprintf(w, "Deadline: %s; %s - %s\n", item.Deadline, item.StartDate, item.Deadline)
+	} else if item.Deadline != "" {
+		fmt.Fprintf(w, "Deadline: %s\n", item.Deadline)
+	}
+}
+
+// printHuman outputs a compact, readable multi-line format.
+// Single items use key-value. Lists use blank-line-separated blocks.
 func (f *Formatter) printHuman(w io.Writer, data interface{}) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 
@@ -240,25 +302,34 @@ func (f *Formatter) printHuman(w io.Writer, data interface{}) error {
 		return tw.Flush()
 
 	case *model.PaginatedResponse[model.ToDo]:
-		fmt.Fprintln(tw, "TITLE\tPROJECT\tDEADLINE")
-		for _, item := range value.Results {
-			fmt.Fprintf(tw, "%s\t%s\t%s\n", item.Title, item.Project, item.Deadline)
+		for i, item := range value.Results {
+			if i > 0 {
+				fmt.Fprintln(w)
+			}
+			printToDo(w, item)
 		}
-		return tw.Flush()
+		return nil
 
 	case *model.PaginatedResponse[model.Project]:
-		fmt.Fprintln(tw, "TITLE\tAREA\tOPEN/TOTAL")
-		for _, item := range value.Results {
-			fmt.Fprintf(tw, "%s\t%s\t%d/%d\n", item.Title, item.Area, item.OpenTaskCount, item.TaskCount)
+		for i, item := range value.Results {
+			if i > 0 {
+				fmt.Fprintln(w)
+			}
+			printProject(w, item)
 		}
-		return tw.Flush()
+		return nil
 
 	case *model.PaginatedResponse[model.Area]:
-		fmt.Fprintln(tw, "NAME")
-		for _, item := range value.Results {
-			fmt.Fprintln(tw, item.Name)
+		for i, item := range value.Results {
+			if i > 0 {
+				fmt.Fprintln(w)
+			}
+			fmt.Fprintln(w, item.Name)
+			if len(item.Tags) > 0 {
+				fmt.Fprintf(w, "Tags: %s\n", strings.Join(item.Tags, " | "))
+			}
 		}
-		return tw.Flush()
+		return nil
 
 	case *model.PaginatedResponse[model.Tag]:
 		currentParent := ""
@@ -269,20 +340,20 @@ func (f *Formatter) printHuman(w io.Writer, data interface{}) error {
 			}
 			if index == 0 || parent != currentParent {
 				if index > 0 {
-					fmt.Fprintln(tw)
+					fmt.Fprintln(w)
 				}
-				fmt.Fprintf(tw, "[%s]\n", parent)
-				fmt.Fprintln(tw, "NAME\tSHORTCUT")
+				fmt.Fprintf(w, "[%s]\n", parent)
 				currentParent = parent
 			}
-			fmt.Fprintf(tw, "%s\t%s\n", item.Name, item.Shortcut)
+			if item.Shortcut != "" {
+				fmt.Fprintf(w, "%s  (%s)\n", item.Name, item.Shortcut)
+			} else {
+				fmt.Fprintln(w, item.Name)
+			}
 		}
-		if len(value.Results) == 0 {
-			fmt.Fprintln(tw, "NAME\tSHORTCUT")
-		}
-		return tw.Flush()
+		return nil
 
 	default:
-		return json.NewEncoder(tw).Encode(data)
+		return json.NewEncoder(w).Encode(data)
 	}
 }
