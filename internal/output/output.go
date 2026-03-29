@@ -225,21 +225,35 @@ func printTagTree(w io.Writer, tags []model.Tag) {
 		byParent[tag.ParentID] = append(byParent[tag.ParentID], tag)
 	}
 
-	var printNode func(tag model.Tag, depth int)
-	printNode = func(tag model.Tag, depth int) {
-		indent := strings.Repeat("  ", depth)
-		if tag.Shortcut != "" {
-			fmt.Fprintf(w, "%s[%s] %s  (%s)\n", indent, tag.ID, tag.Name, tag.Shortcut)
-		} else {
-			fmt.Fprintf(w, "%s[%s] %s\n", indent, tag.ID, tag.Name)
-		}
-		for _, child := range byParent[tag.ID] {
-			printNode(child, depth+1)
+	var printChildren func(parentID string, prefix string)
+	printChildren = func(parentID string, prefix string) {
+		children := byParent[parentID]
+		for i, child := range children {
+			isLast := i == len(children)-1
+			connector := "├── "
+			if isLast {
+				connector = "└── "
+			}
+			if child.Shortcut != "" {
+				fmt.Fprintf(w, "%s%s[%s] %s  (%s)\n", prefix, connector, child.ID, child.Name, child.Shortcut)
+			} else {
+				fmt.Fprintf(w, "%s%s[%s] %s\n", prefix, connector, child.ID, child.Name)
+			}
+			nextPrefix := prefix + "│   "
+			if isLast {
+				nextPrefix = prefix + "    "
+			}
+			printChildren(child.ID, nextPrefix)
 		}
 	}
 
 	for _, root := range byParent[""] {
-		printNode(root, 0)
+		if root.Shortcut != "" {
+			fmt.Fprintf(w, "[%s] %s  (%s)\n", root.ID, root.Name, root.Shortcut)
+		} else {
+			fmt.Fprintf(w, "[%s] %s\n", root.ID, root.Name)
+		}
+		printChildren(root.ID, "")
 	}
 }
 

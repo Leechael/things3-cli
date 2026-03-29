@@ -83,14 +83,20 @@ func TestFormatterTagListTree(t *testing.T) {
 	}
 
 	got := out.String()
-	// Root tags appear at column 0; children indented with two spaces
-	if !strings.Contains(got, "[ctx-1] Context") {
-		t.Fatalf("expected root tag line, got: %q", got)
+	// Root tags have no connector prefix
+	if !strings.Contains(got, "[ctx-1] Context\n") {
+		t.Fatalf("expected root tag line without connector, got: %q", got)
 	}
-	if !strings.Contains(got, "  [tag-1] Errand") {
-		t.Fatalf("expected indented child tag, got: %q", got)
+	// Non-last child uses ├──
+	if !strings.Contains(got, "├── [tag-1] Errand") {
+		t.Fatalf("expected non-last child with ├── connector, got: %q", got)
 	}
-	if !strings.Contains(got, "[tag-3] Untagged") {
+	// Last child uses └──
+	if !strings.Contains(got, "└── [tag-2] Home") {
+		t.Fatalf("expected last child with └── connector, got: %q", got)
+	}
+	// Another root tag
+	if !strings.Contains(got, "[tag-3] Untagged\n") {
 		t.Fatalf("expected root tag line for Untagged, got: %q", got)
 	}
 }
