@@ -8,7 +8,7 @@ import (
 )
 
 func newAddCmd() *cobra.Command {
-	cmd := newAddCommand("add", "Create a to-do via things:///add")
+	cmd := newAddCommand("add", "Create a to-do")
 	cmd.Hidden = true
 	return cmd
 }

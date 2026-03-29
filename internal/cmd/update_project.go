@@ -8,7 +8,7 @@ import (
 )
 
 func newUpdateProjectCmd() *cobra.Command {
-	cmd := newUpdateProjectCommand("update-project --id <project-uuid>", "Update a project via things:///update-project")
+	cmd := newUpdateProjectCommand("update-project --id <project-uuid>", "Update a project")
 	cmd.Hidden = true
 	return cmd
 }

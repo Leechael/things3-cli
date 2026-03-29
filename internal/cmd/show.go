@@ -10,7 +10,7 @@ func newShowCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "show",
-		Short: "Navigate in Things via things:///show",
+		Short: "Navigate to an item or list in Things",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := getClient(cmd)
 			if err != nil {

@@ -17,7 +17,7 @@ func newJSONCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "json",
-		Short: "Run batch operations via things:///json",
+		Short: "Run batch operations from a JSON payload",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dataFile != "" {
 				content, err := os.ReadFile(dataFile)

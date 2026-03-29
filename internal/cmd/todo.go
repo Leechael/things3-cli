@@ -131,11 +131,11 @@ func newTodoGetCommand(use string, short string) *cobra.Command {
 }
 
 func newDeleteTodoCmd() *cobra.Command {
-	return newTodoDeleteCommand("delete-todo", "Delete a to-do via AppleScript")
+	return newTodoDeleteCommand("delete-todo", "Delete a to-do")
 }
 
 func newTodoDeleteCmd() *cobra.Command {
-	return newTodoDeleteCommand("delete", "Delete a to-do via AppleScript")
+	return newTodoDeleteCommand("delete", "Delete a to-do")
 }
 
 func newTodoDeleteCommand(use string, short string) *cobra.Command {
@@ -168,7 +168,7 @@ func newTodoDeleteCommand(use string, short string) *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.StringVar(&params.ID, "id", "", "To-do UUID")
-	flags.StringVar(&params.Name, "name", "", "To-do title (used directly by AppleScript)")
+	flags.StringVar(&params.Name, "name", "", "To-do title")
 
 	return cmd
 }

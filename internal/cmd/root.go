@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	helpdocs "github.com/Leechael/things3--cli/docs/help"
 	"github.com/Leechael/things3--cli/internal/client"
 	"github.com/Leechael/things3--cli/internal/output"
 	"github.com/spf13/cobra"
@@ -30,7 +31,7 @@ func NewRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "things3-cli",
 		Short:         "Things3 command line interface",
-		Long:          "Things3 CLI (SQLite read + URL Scheme write + AppleScript management)",
+		Long:          "Things3 CLI — manage to-dos, projects, areas, and tags from the command line.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -244,7 +245,17 @@ func renderRootHelp(cmd *cobra.Command) {
 		_, _ = fmt.Fprintln(out)
 	}
 
+	topics := helpTopicList()
+	if len(topics) > 0 {
+		_, _ = fmt.Fprintln(out, "Help Topics:")
+		for _, line := range topics {
+			_, _ = fmt.Fprintf(out, "  %-24s %s\n", line.use, line.short)
+		}
+		_, _ = fmt.Fprintln(out)
+	}
+
 	_, _ = fmt.Fprintf(out, "Use \"%s [command] --help\" for more information about a command.\n", cmd.CommandPath())
+	_, _ = fmt.Fprintf(out, "Use \"%s help <topic>\" for topic guides and reference.\n", cmd.CommandPath())
 }
 
 type helpLine struct {
@@ -322,8 +333,8 @@ func isResourceGroup(groupID string) bool {
 func newTopicHelpCmd(root *cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "help [topic|command]",
-		Short: "Show command help or topic guides (todos|projects|areas|tags)",
-		Long:  "Examples: things3-cli help todos, things3-cli help projects, things3-cli help areas, things3-cli help tags",
+		Short: "Show command help or topic guides",
+		Long:  "Use \"things3-cli help <topic>\" for topic guides. Use \"things3-cli help <command>\" for command usage.",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -331,7 +342,19 @@ func newTopicHelpCmd(root *cobra.Command) *cobra.Command {
 			}
 
 			if len(args) == 1 {
-				if doc, ok := topicHelpDoc(strings.ToLower(strings.TrimSpace(args[0]))); ok {
+				arg := strings.ToLower(strings.TrimSpace(args[0]))
+
+				if strings.HasPrefix(arg, "errcode-") {
+					code := strings.TrimPrefix(arg, "errcode-")
+					if doc, ok := errorHelpDoc(code); ok {
+						_, err := fmt.Fprintln(cmd.OutOrStdout(), doc)
+						return err
+					}
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "no help topic for errcode %q\n", code)
+					return fmt.Errorf("no help topic for errcode %q", code)
+				}
+
+				if doc, ok := topicHelpDoc(arg); ok {
 					_, err := fmt.Fprintln(cmd.OutOrStdout(), doc)
 					return err
 				}
@@ -342,9 +365,9 @@ func newTopicHelpCmd(root *cobra.Command) *cobra.Command {
 				return target.Help()
 			}
 
-			message := fmt.Sprintf("unknown help topic %q, available topics: todos, projects, areas, tags", args[0])
-			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), message)
-			return errors.New(message)
+			available := availableTopics()
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "unknown help topic %q\n\nAvailable topics: %s\n", args[0], strings.Join(available, ", "))
+			return fmt.Errorf("unknown help topic %q", args[0])
 		},
 	}
 
@@ -354,149 +377,67 @@ func newTopicHelpCmd(root *cobra.Command) *cobra.Command {
 }
 
 func topicHelpDoc(topic string) (string, bool) {
-	switch topic {
-	case "todo", "todos":
-		return todosHelpDoc, true
-	case "project", "projects":
-		return projectsHelpDoc, true
-	case "area", "areas":
-		return areasHelpDoc, true
-	case "tag", "tags":
-		return tagsHelpDoc, true
-	default:
+	aliases := map[string]string{
+		"todo":    "todos",
+		"project": "projects",
+		"area":    "areas",
+		"tag":     "tags",
+	}
+	if canonical, ok := aliases[topic]; ok {
+		topic = canonical
+	}
+	data, err := helpdocs.FS.ReadFile("topics/" + topic + ".md")
+	if err != nil {
 		return "", false
 	}
+	return string(data), true
 }
 
-const todosHelpDoc = `# Todos guide
+func errorHelpDoc(code string) (string, bool) {
+	data, err := helpdocs.FS.ReadFile("errors/" + code + ".md")
+	if err != nil {
+		return "", false
+	}
+	return string(data), true
+}
 
-Overview
-- Data model: To-Do is the core actionable item in Things.
-- This CLI uses SQLite for read and URL Scheme for create/update.
-- Delete is implemented via AppleScript (macOS only).
+func helpTopicList() []helpLine {
+	entries, err := helpdocs.FS.ReadDir("topics")
+	if err != nil {
+		return nil
+	}
+	var lines []helpLine
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ".md")
+		desc := topicFirstLine("topics/" + entry.Name())
+		lines = append(lines, helpLine{use: name, short: desc})
+	}
+	return lines
+}
 
-CLI commands
-- things3-cli add-todo ...
-- things3-cli ls-todo [full filters]
-- things3-cli inbox|today|upcoming|anytime|someday [filters]
-- things3-cli get-todo <id>
-- things3-cli update-todo --id <id> ...
-- things3-cli delete-todo --id <id> | --name <title>
+func topicFirstLine(path string) string {
+	data, err := helpdocs.FS.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		return line
+	}
+	return ""
+}
 
-Key best practices
-1) Prefer ID-based operations for reliability.
-2) Use --json (+ --jq) in automation scripts.
-3) ls/add-todo support project/area by name directly.
-4) For tag filters in ls, use --tags with comma-separated names (AND match).
-5) Keep reads from SQLite and writes from URL Scheme/AppleScript.
-
-Important constraints (from local docs + Things docs)
-- URL Scheme cannot delete to-dos; AppleScript can.
-- Repeating to-dos have update limitations (when/deadline/completed).
-- Checklist single-item edit is not supported by URL Scheme.
-
-Source references
-- docs/things3-concepts_zh.md
-- docs/url-scheme_zh.md
-- docs/operations-matrix_zh.md
-- Official URL Scheme: https://culturedcode.com/things/support/articles/2803573/
-- Official AppleScript: https://culturedcode.com/things/support/articles/4562654/
-`
-
-const projectsHelpDoc = `# Projects guide
-
-Overview
-- Project groups multiple to-dos and can include headings.
-- This CLI supports project create/read/update/delete.
-- Create/update uses URL Scheme; delete uses AppleScript.
-
-CLI commands
-- things3-cli projects create ...
-- things3-cli projects list|ls [filters]
-- things3-cli projects get <id>
-- things3-cli projects update --id <id> ...
-- things3-cli projects delete --id <id> | --name <title>
-
-Key best practices
-1) Use area assignment early for better organization.
-2) Use tags as context, not as primary hierarchy.
-3) Prefer --id for destructive actions.
-4) Validate project completion preconditions before setting completed/canceled.
-
-Important constraints
-- URL Scheme cannot delete projects.
-- update-project cannot append child to-dos directly.
-- Heading management is limited in URL Scheme and better handled via Shortcuts.
-
-Source references
-- docs/operations-matrix_zh.md
-- docs/url-scheme_zh.md
-- docs/shortcuts-actions_zh.md
-- Official URL Scheme: https://culturedcode.com/things/support/articles/2803573/
-- Official Shortcuts: https://culturedcode.com/things/support/articles/9596775/
-`
-
-const areasHelpDoc = `# Areas guide
-
-Overview
-- Area is a long-lived responsibility domain (e.g., Work, Personal, Health).
-- URL Scheme does not manage areas directly.
-- This CLI implements area create/update/delete via AppleScript.
-
-CLI commands
-- things3-cli areas create --name <name> [--tags "..."]
-- things3-cli areas list|ls [filters]
-- things3-cli areas get <id>
-- things3-cli areas update --id <id>|--name <name> [--new-name ...] [--tags ...]
-- things3-cli areas delete --id <id>|--name <name>
-
-Key best practices
-1) Use areas for stable domains, not short-term tasks.
-2) Keep area names stable and concise.
-3) Prefer --id for update/delete when available.
-4) In scripts, pair area reads with --json output.
-
-Important constraints
-- URL Scheme cannot create/update/delete areas.
-- Area operations here require macOS + AppleScript runtime.
-
-Source references
-- docs/applescript_zh.md
-- docs/operations-matrix_zh.md
-- docs/other-integration_zh.md
-- Official AppleScript intro: https://culturedcode.com/things/support/articles/2803572/
-- Official AppleScript reference: https://culturedcode.com/things/support/articles/4562654/
-`
-
-const tagsHelpDoc = `# Tags guide
-
-Overview
-- Tag is a cross-cutting context label and supports hierarchy (parent tag).
-- URL Scheme can reference existing tags but cannot create/update/delete tag definitions.
-- This CLI implements tag create/update/delete via AppleScript.
-
-CLI commands
-- things3-cli tags create --name <name> [--parent-name <name>|--parent-id <id>]
-- things3-cli tags list|ls [filters]
-- things3-cli tags get <id>
-- things3-cli tags update --id <id>|--name <name> [--new-name <name>] [--parent-name <name>|--parent-id <id>]
-- things3-cli tags delete --id <id>|--name <name>
-
-Key best practices
-1) Use stable top-level tags and keep hierarchy shallow.
-2) tags list output is grouped by parent for readability.
-3) Use --id for update/delete in scripts.
-4) Avoid name collisions when multiple tags have similar names.
-5) Remember URL-based create/update only applies existing tags.
-
-Important constraints
-- URL Scheme does not manage tag definitions.
-- Tag CRUD here requires macOS + AppleScript runtime.
-
-Source references
-- docs/applescript_zh.md
-- docs/operations-matrix_zh.md
-- docs/url-scheme_zh.md
-- Official AppleScript reference: https://culturedcode.com/things/support/articles/4562654/
-- Official URL Scheme: https://culturedcode.com/things/support/articles/2803573/
-`
+func availableTopics() []string {
+	lines := helpTopicList()
+	names := make([]string, len(lines))
+	for i, l := range lines {
+		names[i] = l.use
+	}
+	return names
+}

@@ -10,7 +10,7 @@ func newSearchCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "search [query]",
-		Short: "Open Things search via things:///search",
+		Short: "Open Things search",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {

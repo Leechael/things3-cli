@@ -28,7 +28,7 @@ func newAreaCreateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create an area via AppleScript",
+		Short: "Create an area",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if params.Name == "" {
 				return fmt.Errorf("--name is required")
@@ -122,7 +122,7 @@ func newAreaUpdateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "update",
-		Short: "Update an area via AppleScript",
+		Short: "Update an area",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flags := cmd.Flags()
 			params.NewName = stringPointerIfChanged(flags, "new-name", newName)
@@ -165,7 +165,7 @@ func newAreaDeleteCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete an area via AppleScript",
+		Short: "Delete an area",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if params.ID == "" && params.Name == "" {
 				return fmt.Errorf("either --id or --name is required")

@@ -88,7 +88,7 @@ func newProjectDeleteCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete a project via AppleScript",
+		Short: "Delete a project",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if params.ID == "" && params.Name == "" {
 				return fmt.Errorf("either --id or --name is required")
@@ -113,7 +113,7 @@ func newProjectDeleteCmd() *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.StringVar(&params.ID, "id", "", "Project UUID")
-	flags.StringVar(&params.Name, "name", "", "Project title (used directly by AppleScript)")
+	flags.StringVar(&params.Name, "name", "", "Project title")
 
 	return cmd
 }

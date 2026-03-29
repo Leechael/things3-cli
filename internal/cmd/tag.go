@@ -28,7 +28,7 @@ func newTagCreateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create a tag via AppleScript",
+		Short: "Create a tag",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if params.Name == "" {
 				return fmt.Errorf("--name is required")
@@ -127,7 +127,7 @@ func newTagUpdateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "update",
-		Short: "Update a tag via AppleScript",
+		Short: "Update a tag",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if params.ID == "" && params.Name == "" {
 				return fmt.Errorf("either --id or --name is required")
@@ -173,7 +173,7 @@ func newTagDeleteCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete a tag via AppleScript",
+		Short: "Delete a tag",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if params.ID == "" && params.Name == "" {
 				return fmt.Errorf("either --id or --name is required")

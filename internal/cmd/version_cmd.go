@@ -5,7 +5,7 @@ import "github.com/spf13/cobra"
 func newVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
-		Short: "Run things:///version",
+		Short: "Show Things version",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := getClient(cmd)
 			if err != nil {

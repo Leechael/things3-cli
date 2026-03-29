@@ -6,7 +6,7 @@ import (
 )
 
 func newAddProjectCmd() *cobra.Command {
-	cmd := newAddProjectCommand("add-project", "Create a project via things:///add-project")
+	cmd := newAddProjectCommand("add-project", "Create a project")
 	cmd.Hidden = true
 	return cmd
 }
