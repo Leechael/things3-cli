@@ -123,6 +123,7 @@ func (c *Client) GetStatus() (*model.Status, error) {
 // ListToDoParams controls todo list filtering.
 type ListToDoParams struct {
 	ID             string
+	View           string
 	Status         string
 	ProjectID      string
 	ProjectName    string
@@ -140,6 +141,7 @@ type ListToDoParams struct {
 func (p ListToDoParams) encode() url.Values {
 	values := url.Values{}
 	setIfNotEmpty(values, "id", p.ID)
+	setIfNotEmpty(values, "view", p.View)
 	setIfNotEmpty(values, "status", p.Status)
 	setIfNotEmpty(values, "project-id", p.ProjectID)
 	setIfNotEmpty(values, "project", p.ProjectName)
@@ -216,7 +218,12 @@ LEFT JOIN TMTag tag ON tag.uuid = tt.tags
 WHERE t.type = 0
 `)
 
-	args := make([]any, 0, 12)
+	view := strings.ToLower(strings.TrimSpace(params.View))
+	if view == "" {
+		view = "all"
+	}
+
+	args := make([]any, 0, 16)
 	if !params.IncludeTrashed {
 		query.WriteString(" AND IFNULL(t.trashed, 0) = 0")
 	}
@@ -227,6 +234,9 @@ WHERE t.type = 0
 	if statusCode >= 0 {
 		query.WriteString(" AND t.status = ?")
 		args = append(args, statusCode)
+	}
+	if err := appendTodoViewFilter(&query, view, statusCode >= 0); err != nil {
+		return nil, err
 	}
 	if params.ProjectID != "" {
 		query.WriteString(" AND t.project = ?")
@@ -273,7 +283,7 @@ WHERE t.type = 0
 GROUP BY
   t.uuid, t.title, t.notes, t.status, t.start, t.startDate, t.deadline,
   t.project, p.title, t.area, a.title, t.heading, h.title, t.rt1_recurrenceRule
-ORDER BY t."index"
+ORDER BY IFNULL(t.startDate, 0) DESC, IFNULL(t.deadline, 0) DESC, t."index" DESC
 LIMIT ? OFFSET ?`)
 	args = append(args, limit, params.Offset)
 
@@ -465,7 +475,7 @@ GROUP BY
   t.uuid, t.title, t.notes, t.status, t.startDate, t.deadline,
   t.area, a.title, t.untrashedLeafActionsCount, t.openUntrashedLeafActionsCount,
   t.rt1_recurrenceRule
-ORDER BY t."index"
+ORDER BY IFNULL(t.startDate, 0) DESC, IFNULL(t.deadline, 0) DESC, t."index" DESC
 LIMIT ? OFFSET ?`)
 	args = append(args, limit, params.Offset)
 
@@ -1401,6 +1411,52 @@ func (c *Client) resolveDBPath() (string, error) {
 	}
 
 	return "", &APIError{StatusCode: 404, Message: "Things3 database not found; set THINGSDB or ensure Things is installed"}
+}
+
+func appendTodoViewFilter(query *strings.Builder, view string, hasStatusFilter bool) error {
+	todayThingsDate := "((CAST(strftime('%Y','now','localtime') AS INTEGER) << 16) | (CAST(strftime('%m','now','localtime') AS INTEGER) << 12) | (CAST(strftime('%d','now','localtime') AS INTEGER) << 7))"
+
+	switch view {
+	case "", "all":
+		return nil
+	case "inbox":
+		query.WriteString(" AND t.start = 0")
+		if !hasStatusFilter {
+			query.WriteString(" AND t.status = 0")
+		}
+		return nil
+	case "anytime":
+		query.WriteString(" AND t.start = 1")
+		query.WriteString(" AND (t.startDate IS NULL OR t.startDate <= " + todayThingsDate + ")")
+		if !hasStatusFilter {
+			query.WriteString(" AND t.status = 0")
+		}
+		return nil
+	case "someday":
+		query.WriteString(" AND t.start = 2")
+		if !hasStatusFilter {
+			query.WriteString(" AND t.status = 0")
+		}
+		return nil
+	case "upcoming":
+		query.WriteString(" AND t.startDate IS NOT NULL AND t.startDate > " + todayThingsDate)
+		if !hasStatusFilter {
+			query.WriteString(" AND t.status = 0")
+		}
+		return nil
+	case "today":
+		query.WriteString(" AND (")
+		query.WriteString("(t.start = 1 AND t.startDate IS NOT NULL AND t.startDate <= " + todayThingsDate + ")")
+		query.WriteString(" OR (t.start = 2 AND t.startDate IS NOT NULL AND t.startDate < " + todayThingsDate + ")")
+		query.WriteString(" OR (t.startDate IS NULL AND t.deadline IS NOT NULL AND t.deadline <= " + todayThingsDate + " AND (t.deadlineSuppressionDate IS NULL OR t.deadlineSuppressionDate < " + todayThingsDate + "))")
+		query.WriteString(")")
+		if !hasStatusFilter {
+			query.WriteString(" AND t.status = 0")
+		}
+		return nil
+	default:
+		return fmt.Errorf("invalid --view %q, valid values: all|inbox|today|upcoming|anytime|someday", view)
+	}
 }
 
 func mapStatus(status string) (int, error) {

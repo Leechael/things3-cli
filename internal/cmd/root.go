@@ -64,6 +64,21 @@ func NewRootCmd() *cobra.Command {
 	lsTodoCmd := newLSTodoCmd()
 	lsTodoCmd.GroupID = "todos"
 
+	inboxCmd := newInboxCmd()
+	inboxCmd.GroupID = "todos"
+
+	todayCmd := newTodayCmd()
+	todayCmd.GroupID = "todos"
+
+	upcomingCmd := newUpcomingCmd()
+	upcomingCmd.GroupID = "todos"
+
+	anytimeCmd := newAnytimeCmd()
+	anytimeCmd.GroupID = "todos"
+
+	somedayCmd := newSomedayCmd()
+	somedayCmd.GroupID = "todos"
+
 	getTodoCmd := newGetTodoCmd()
 	getTodoCmd.GroupID = "todos"
 
@@ -72,9 +87,6 @@ func NewRootCmd() *cobra.Command {
 
 	deleteTodoCmd := newDeleteTodoCmd()
 	deleteTodoCmd.GroupID = "todos"
-
-	todosCmd := newTodoCmd()
-	todosCmd.Hidden = true
 
 	projectsCmd := newProjectCmd()
 	projectsCmd.GroupID = "projects"
@@ -120,10 +132,14 @@ func NewRootCmd() *cobra.Command {
 		statusCmd,
 		addTodoCmd,
 		lsTodoCmd,
+		inboxCmd,
+		todayCmd,
+		upcomingCmd,
+		anytimeCmd,
+		somedayCmd,
 		getTodoCmd,
 		updateTodoCmd,
 		deleteTodoCmd,
-		todosCmd,
 		projectsCmd,
 		areasCmd,
 		tagCmd,
@@ -361,7 +377,8 @@ Overview
 
 CLI commands
 - things3-cli add-todo ...
-- things3-cli ls [filters]
+- things3-cli ls-todo [full filters]
+- things3-cli inbox|today|upcoming|anytime|someday [filters]
 - things3-cli get-todo <id>
 - things3-cli update-todo --id <id> ...
 - things3-cli delete-todo --id <id> | --name <title>

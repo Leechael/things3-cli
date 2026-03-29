@@ -25,15 +25,35 @@ func newTodoCmd() *cobra.Command {
 }
 
 func newLSTodoCmd() *cobra.Command {
-	return newTodoListCommand("ls", "List to-dos", []string{"list"})
+	return newTodoListCommand("ls-todo", "List to-dos with full filters", nil, "", true)
+}
+
+func newInboxCmd() *cobra.Command {
+	return newTodoListCommand("inbox", "List inbox to-dos", nil, "inbox", false)
+}
+
+func newTodayCmd() *cobra.Command {
+	return newTodoListCommand("today", "List today to-dos", nil, "today", false)
+}
+
+func newUpcomingCmd() *cobra.Command {
+	return newTodoListCommand("upcoming", "List upcoming to-dos", nil, "upcoming", false)
+}
+
+func newAnytimeCmd() *cobra.Command {
+	return newTodoListCommand("anytime", "List anytime to-dos", nil, "anytime", false)
+}
+
+func newSomedayCmd() *cobra.Command {
+	return newTodoListCommand("someday", "List someday to-dos", nil, "someday", false)
 }
 
 func newTodoListCmd() *cobra.Command {
-	return newTodoListCommand("list", "List to-dos", []string{"ls"})
+	return newTodoListCommand("list", "List to-dos", []string{"ls"}, "", true)
 }
 
-func newTodoListCommand(use string, short string, aliases []string) *cobra.Command {
-	params := client.ListToDoParams{}
+func newTodoListCommand(use string, short string, aliases []string, defaultView string, allowViewFlag bool) *cobra.Command {
+	params := client.ListToDoParams{View: defaultView}
 
 	cmd := &cobra.Command{
 		Use:     use,
@@ -59,6 +79,9 @@ func newTodoListCommand(use string, short string, aliases []string) *cobra.Comma
 	}
 
 	flags := cmd.Flags()
+	if allowViewFlag {
+		flags.StringVar(&params.View, "view", defaultView, "Todo view: all|inbox|today|upcoming|anytime|someday")
+	}
 	flags.StringVar(&params.Status, "status", "", "Filter by status: incomplete|completed|canceled")
 	flags.StringVar(&params.ProjectID, "project-id", "", "Filter by project UUID")
 	flags.StringVar(&params.ProjectName, "project", "", "Filter by project name")

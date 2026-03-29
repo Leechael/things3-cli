@@ -50,12 +50,13 @@ things3-cli status --json
 ### To-do CRUD（核心顶层命令）
 
 - `add-todo`（create）
-- `ls`（read list）
+- `ls-todo`（read list with full filters）
 - `get-todo <id>`（read one）
 - `update-todo --id <id> ...`（update）
 - `delete-todo --id <id>|--name <title>`（delete，AppleScript）
 
-`add-todo` 与 `ls` 支持直接按名称输入 `project` / `area`，并支持 `--tags` 多标签（逗号分隔；`ls` 为 AND 匹配）。
+`add-todo` 与 `ls-todo` 支持直接按名称输入 `project` / `area`，并支持 `--tags` 多标签（逗号分隔；`ls-todo` 为 AND 匹配）。
+同时提供 `inbox` / `today` / `upcoming` / `anytime` / `someday` 作为常用视图命令，并支持与 `project` / `area` / `tags` 组合过滤。
 
 ### Project operations
 
@@ -96,9 +97,13 @@ things3-cli status --json
 ## Usage examples
 
 ```bash
-# 列出任务（核心 ls 命令）
-things3-cli ls --search "today"
-things3-cli ls --status incomplete --project "Home" --tags "Errand,Important" --json
+# 列出任务（核心 ls-todo 命令）
+things3-cli ls-todo --search "today"
+things3-cli ls-todo --status incomplete --project "Home" --tags "Errand,Important" --json
+
+# 常用视图命令（支持组合过滤）
+things3-cli inbox --project "Dashboard" --area "Phala Cloud"
+things3-cli today --tags "Errand,Important"
 
 # 创建/更新/删除 to-do（顶层命令）
 things3-cli add-todo --title "Buy milk" --when today --project "Shopping" --tags "Errand,Important"
