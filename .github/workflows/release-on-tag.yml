@@ -62,18 +62,16 @@ jobs:
           test -n "$BUILD_TARGET"
           test -n "$VERSION_VAR_PATH"
 
-      - name: Build cross-platform artifacts
+      - name: Build macOS artifacts
         run: |
           source release-naming.env
           mkdir -p dist
-          for os in darwin linux; do
-            for arch in amd64 arm64; do
-              artifact="dist/${BINARY_NAME}-${os}-${arch}.tar.gz"
-              tmpdir=$(mktemp -d)
-              CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -ldflags="-s -w -X ${VERSION_VAR_PATH}=${RELEASE_TAG#${TAG_PREFIX}}" -o "$tmpdir/${BINARY_NAME}" "$BUILD_TARGET"
-              tar -czf "$artifact" -C "$tmpdir" "$BINARY_NAME"
-              rm -rf "$tmpdir"
-            done
+          for arch in amd64 arm64; do
+            artifact="dist/${BINARY_NAME}-darwin-${arch}.tar.gz"
+            tmpdir=$(mktemp -d)
+            CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go build -trimpath -ldflags="-s -w -X ${VERSION_VAR_PATH}=${RELEASE_TAG#${TAG_PREFIX}}" -o "$tmpdir/${BINARY_NAME}" "$BUILD_TARGET"
+            tar -czf "$artifact" -C "$tmpdir" "$BINARY_NAME"
+            rm -rf "$tmpdir"
           done
           (cd dist && sha256sum ./*.tar.gz > checksums.txt)
 

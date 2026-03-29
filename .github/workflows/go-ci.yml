@@ -87,7 +87,7 @@ jobs:
             echo "BINARY_NAME=things3-cli" >> "$GITHUB_ENV"
           fi
 
-      - name: Build
+      - name: Build (darwin)
         run: |
           mkdir -p bin
-          go build -v -o "bin/${BINARY_NAME}" "${BUILD_TARGET}"
+          GOOS=darwin GOARCH=arm64 go build -v -o "bin/${BINARY_NAME}" "${BUILD_TARGET}"
