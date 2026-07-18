@@ -18,7 +18,7 @@ fi
 # shellcheck disable=SC1090
 source "$env_file"
 
-for key in CLI_NAME BINARY_NAME TAG_PREFIX ARTIFACT_GLOB BUILD_TARGET VERSION_VAR_PATH; do
+for key in CLI_NAME BINARY_NAME TAG_PREFIX ARTIFACT_GLOB BUILD_TARGET VERSION_VAR_PATH GIT_COMMIT_VAR_PATH BUILD_TIME_VAR_PATH; do
   if [[ -z "${!key:-}" ]]; then
     echo "release-naming.env missing value: $key" >&2
     exit 1
@@ -71,7 +71,7 @@ if ! rg -n "CHANGELOG\\.md|body_path:\\s*dist/CHANGELOG\\.md" "$release_on_tag" 
   exit 1
 fi
 
-if ! rg -n "BINARY_NAME|BUILD_TARGET|ARTIFACT_GLOB" "$release_on_tag" >/dev/null; then
+if ! rg -n "BINARY_NAME|BUILD_TARGET|ARTIFACT_GLOB|VERSION_VAR_PATH|GIT_COMMIT_VAR_PATH|BUILD_TIME_VAR_PATH" "$release_on_tag" >/dev/null; then
   echo "release-on-tag.yml must read naming contract fields" >&2
   exit 1
 fi

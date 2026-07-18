@@ -82,12 +82,22 @@ jobs:
             source release-naming.env
             echo "BUILD_TARGET=${BUILD_TARGET}" >> "$GITHUB_ENV"
             echo "BINARY_NAME=${BINARY_NAME}" >> "$GITHUB_ENV"
+            echo "VERSION_VAR_PATH=${VERSION_VAR_PATH}" >> "$GITHUB_ENV"
+            echo "GIT_COMMIT_VAR_PATH=${GIT_COMMIT_VAR_PATH}" >> "$GITHUB_ENV"
+            echo "BUILD_TIME_VAR_PATH=${BUILD_TIME_VAR_PATH}" >> "$GITHUB_ENV"
           else
             echo "BUILD_TARGET=./cmd/things3-cli" >> "$GITHUB_ENV"
             echo "BINARY_NAME=things3-cli" >> "$GITHUB_ENV"
+            echo "VERSION_VAR_PATH=github.com/Leechael/things3--cli/pkg/version.Version" >> "$GITHUB_ENV"
+            echo "GIT_COMMIT_VAR_PATH=github.com/Leechael/things3--cli/pkg/version.GitCommit" >> "$GITHUB_ENV"
+            echo "BUILD_TIME_VAR_PATH=github.com/Leechael/things3--cli/pkg/version.BuildTime" >> "$GITHUB_ENV"
           fi
 
       - name: Build (darwin)
         run: |
           mkdir -p bin
-          GOOS=darwin GOARCH=arm64 go build -v -o "bin/${BINARY_NAME}" "${BUILD_TARGET}"
+          version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)
+          git_commit=$(git rev-parse HEAD 2>/dev/null || echo unknown)
+          build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          ldflags="-s -w -X ${VERSION_VAR_PATH}=${version} -X ${GIT_COMMIT_VAR_PATH}=${git_commit} -X ${BUILD_TIME_VAR_PATH}=${build_time}"
+          GOOS=darwin GOARCH=arm64 go build -v -ldflags="$ldflags" -o "bin/${BINARY_NAME}" "${BUILD_TARGET}"

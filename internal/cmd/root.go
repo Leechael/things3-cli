@@ -9,6 +9,7 @@ import (
 	helpdocs "github.com/Leechael/things3--cli/docs/help"
 	"github.com/Leechael/things3--cli/internal/client"
 	"github.com/Leechael/things3--cli/internal/output"
+	buildversion "github.com/Leechael/things3--cli/pkg/version"
 	"github.com/spf13/cobra"
 )
 
@@ -22,10 +23,11 @@ const (
 // NewRootCmd creates the root command.
 func NewRootCmd() *cobra.Command {
 	var (
-		token   string
-		jsonOut bool
-		plain   bool
-		jqExpr  string
+		token       string
+		jsonOut     bool
+		plain       bool
+		jqExpr      string
+		showVersion bool
 	)
 
 	cmd := &cobra.Command{
@@ -34,6 +36,19 @@ func NewRootCmd() *cobra.Command {
 		Long:          "Things3 CLI — manage to-dos, projects, areas, and tags from the command line.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if showVersion {
+				_, err := fmt.Fprintf(
+					cmd.OutOrStdout(),
+					"version: %s\ngit_commit: %s\nbuild_time: %s\n",
+					buildversion.Version,
+					buildversion.GitCommit,
+					buildversion.BuildTime,
+				)
+				return err
+			}
+			return cmd.Help()
+		},
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if jqExpr != "" && !jsonOut {
 				return fmt.Errorf("--jq requires --json")
@@ -44,6 +59,8 @@ func NewRootCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVarP(&showVersion, "version", "v", false, "Show CLI build version")
 
 	pf := cmd.PersistentFlags()
 	pf.StringVar(&token, "token", "", "Things URL auth token (falls back to THINGS_API_TOKEN)")

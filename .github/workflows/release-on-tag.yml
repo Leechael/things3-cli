@@ -61,15 +61,20 @@ jobs:
           test -n "$ARTIFACT_GLOB"
           test -n "$BUILD_TARGET"
           test -n "$VERSION_VAR_PATH"
+          test -n "$GIT_COMMIT_VAR_PATH"
+          test -n "$BUILD_TIME_VAR_PATH"
 
       - name: Build macOS artifacts
         run: |
           source release-naming.env
           mkdir -p dist
+          git_commit=$(git rev-parse HEAD)
+          build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          ldflags="-s -w -X ${VERSION_VAR_PATH}=${RELEASE_TAG#${TAG_PREFIX}} -X ${GIT_COMMIT_VAR_PATH}=${git_commit} -X ${BUILD_TIME_VAR_PATH}=${build_time}"
           for arch in amd64 arm64; do
             artifact="dist/${BINARY_NAME}-darwin-${arch}.tar.gz"
             tmpdir=$(mktemp -d)
-            CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go build -trimpath -ldflags="-s -w -X ${VERSION_VAR_PATH}=${RELEASE_TAG#${TAG_PREFIX}}" -o "$tmpdir/${BINARY_NAME}" "$BUILD_TARGET"
+            CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go build -trimpath -ldflags="$ldflags" -o "$tmpdir/${BINARY_NAME}" "$BUILD_TARGET"
             tar -czf "$artifact" -C "$tmpdir" "$BINARY_NAME"
             rm -rf "$tmpdir"
           done

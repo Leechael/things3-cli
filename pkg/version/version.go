@@ -1,4 +1,8 @@
 package version
 
-// Version is the current version of the CLI, set at build time via ldflags.
-var Version = "dev"
+// Build metadata is set at build time via ldflags.
+var (
+	Version   = "dev"
+	GitCommit = "unknown"
+	BuildTime = "unknown"
+)

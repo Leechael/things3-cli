@@ -1,9 +1,43 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"testing"
+
+	buildversion "github.com/Leechael/things3--cli/pkg/version"
 )
+
+func TestRootVersionFlags(t *testing.T) {
+	oldVersion := buildversion.Version
+	oldGitCommit := buildversion.GitCommit
+	oldBuildTime := buildversion.BuildTime
+	t.Cleanup(func() {
+		buildversion.Version = oldVersion
+		buildversion.GitCommit = oldGitCommit
+		buildversion.BuildTime = oldBuildTime
+	})
+
+	buildversion.Version = "1.2.3"
+	buildversion.GitCommit = "abc123"
+	buildversion.BuildTime = "2026-07-18T12:34:56Z"
+	want := "version: 1.2.3\ngit_commit: abc123\nbuild_time: 2026-07-18T12:34:56Z\n"
+
+	for _, flag := range []string{"--version", "-v"} {
+		command := NewRootCmd()
+		var output bytes.Buffer
+		command.SetOut(&output)
+		command.SetErr(&output)
+		command.SetArgs([]string{flag})
+
+		if err := command.Execute(); err != nil {
+			t.Fatalf("%s: %v", flag, err)
+		}
+		if output.String() != want {
+			t.Fatalf("%s output:\nwant: %q\n got: %q", flag, want, output.String())
+		}
+	}
+}
 
 func TestHelpModeForError(t *testing.T) {
 	t.Parallel()
