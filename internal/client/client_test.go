@@ -147,7 +147,7 @@ func TestListToDosFiltersByNameAndMultipleTagsAND(t *testing.T) {
 	}
 }
 
-func TestAddToDoDispatchesURL(t *testing.T) {
+func TestAddToDoDispatchesURLWithEscapedNewlineInNotes(t *testing.T) {
 	t.Parallel()
 
 	runner := &fakeRunner{}
@@ -165,7 +165,7 @@ func TestAddToDoDispatchesURL(t *testing.T) {
 		return []todoIdentity{{
 			ID:    "todo-1",
 			Title: "Test task",
-			Notes: "notes with spaces",
+			Notes: "first line\nsecond line",
 			Area:  "Side Projects",
 		}}, nil
 	}
@@ -174,7 +174,7 @@ func TestAddToDoDispatchesURL(t *testing.T) {
 	reveal := true
 	result, err := c.AddToDo(AddToDoParams{
 		Title:  "Test task",
-		Notes:  "notes with spaces",
+		Notes:  `first line\nsecond line`,
 		List:   "Side Projects",
 		Reveal: &reveal,
 	})
@@ -190,7 +190,7 @@ func TestAddToDoDispatchesURL(t *testing.T) {
 	if len(runner.lastArgs) < 2 {
 		t.Fatalf("unexpected args: %#v", runner.lastArgs)
 	}
-	wantURL := "things:///add?list=Side%20Projects&notes=notes%20with%20spaces&reveal=true&title=Test%20task"
+	wantURL := "things:///add?list=Side%20Projects&notes=first%20line%0Asecond%20line&reveal=true&title=Test%20task"
 	if runner.lastArgs[1] != wantURL {
 		t.Fatalf("unexpected URL:\nwant: %s\n got: %s", wantURL, runner.lastArgs[1])
 	}

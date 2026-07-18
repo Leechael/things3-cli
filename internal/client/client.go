@@ -1069,6 +1069,8 @@ func (p AddToDoParams) encode() url.Values {
 //
 // AddToDo dispatches things:///add and waits until the created to-dos are visible in SQLite.
 func (c *Client) AddToDo(params AddToDoParams) (*model.URLCommandResult, error) {
+	params.Notes = strings.ReplaceAll(params.Notes, `\n`, "\n")
+
 	if err := c.ensureTagsExist(params.Tags); err != nil {
 		return nil, err
 	}
