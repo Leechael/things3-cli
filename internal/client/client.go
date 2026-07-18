@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Leechael/things3--cli/internal/model"
 	_ "modernc.org/sqlite"
@@ -43,10 +44,26 @@ type Config struct {
 
 // Client wraps Things3 local integrations.
 type Client struct {
-	token      string
-	dbPath     string
-	runner     CommandRunner
-	httpClient *http.Client
+	token              string
+	dbPath             string
+	runner             CommandRunner
+	httpClient         *http.Client
+	tagNameLookup      func() (map[string]struct{}, error)
+	todoIdentityLookup func([]string) ([]todoIdentity, error)
+	sleep              func(time.Duration)
+}
+
+type todoIdentity struct {
+	ID        string
+	Title     string
+	Notes     string
+	ProjectID string
+	Project   string
+	AreaID    string
+	Area      string
+	HeadingID string
+	Heading   string
+	Tags      []string
 }
 
 // APIError is used for stable exit code mapping.
@@ -71,12 +88,16 @@ func New(cfg Config) (*Client, error) {
 		httpClient = http.DefaultClient
 	}
 
-	return &Client{
+	c := &Client{
 		token:      cfg.Token,
 		dbPath:     cfg.DBPath,
 		runner:     runner,
 		httpClient: httpClient,
-	}, nil
+		sleep:      time.Sleep,
+	}
+	c.tagNameLookup = c.loadTagNames
+	c.todoIdentityLookup = c.loadTodoIdentities
+	return c, nil
 }
 
 // ProbeHTTP is primarily used in tests and diagnostics.
@@ -1036,9 +1057,38 @@ func (p AddToDoParams) encode() url.Values {
 	return values
 }
 
-// AddToDo dispatches things:///add.
+// To-do creation confirmation lifecycle:
+//
+// STATE       | TRIGGER                 | SOURCE                         | NEXT STATE  | INVARIANT
+// prepared    | URL dispatch succeeds   | add-todo/add/todos create/API | awaiting    | pre-dispatch IDs are captured
+// prepared    | URL dispatch fails      | open command                   | rejected    | no success is returned
+// awaiting    | expected item is visible | Things SQLite                  | confirmed   | title, target, notes, and tags match
+// awaiting    | polling expires         | confirmation timer             | unconfirmed | dispatch is reported as an error
+// confirmed   | return                   | client                         | terminal    | success means persistence was observed
+// unconfirmed | return                   | client                         | terminal    | callers cannot mistake dispatch for persistence
+//
+// AddToDo dispatches things:///add and waits until the created to-dos are visible in SQLite.
 func (c *Client) AddToDo(params AddToDoParams) (*model.URLCommandResult, error) {
-	return c.runURLCommand("add", params.encode())
+	if err := c.ensureTagsExist(params.Tags); err != nil {
+		return nil, err
+	}
+
+	titles, expectedCount := expectedToDoTitles(params)
+	before, err := c.todoIdentityLookup(titles)
+	if err != nil {
+		return nil, fmt.Errorf("snapshot todos before create: %w", err)
+	}
+
+	result, err := c.runURLCommand("add", params.encode())
+	if err != nil {
+		return nil, err
+	}
+	if err := c.waitForCreatedToDos(before, titles, expectedCount, params); err != nil {
+		return nil, &APIError{StatusCode: 1, Message: "URL command dispatched but to-do creation was not confirmed: " + err.Error()}
+	}
+
+	result.Message = "To-do created and confirmed in Things3."
+	return result, nil
 }
 
 // AddProjectParams maps to Things URL command add-project.
@@ -1078,6 +1128,9 @@ func (p AddProjectParams) encode() url.Values {
 
 // AddProject dispatches things:///add-project.
 func (c *Client) AddProject(params AddProjectParams) (*model.URLCommandResult, error) {
+	if err := c.ensureTagsExist(params.Tags); err != nil {
+		return nil, err
+	}
 	return c.runURLCommand("add-project", params.encode())
 }
 
@@ -1241,7 +1294,7 @@ func (c *Client) DeleteProject(params DeleteProjectParams) (*model.URLCommandRes
 		return nil, fmt.Errorf("project name or --id is required")
 	}
 
-	script := fmt.Sprintf("tell application \"Things3\" to delete project named %s", appleScriptString(name))
+	script := fmt.Sprintf("tell application \"Things3\"\n  set targetProject to project named %s\n  delete targetProject\nend tell", appleScriptString(name))
 	return c.runAppleScript("project-delete", script)
 }
 
@@ -1311,9 +1364,241 @@ func (c *Client) JSON(params JSONParams) (*model.URLCommandResult, error) {
 	return c.runURLCommand("json", values)
 }
 
+const (
+	toDoCreationPollAttempts = 60
+	toDoCreationPollInterval = 500 * time.Millisecond
+)
+
+func (c *Client) ensureTagsExist(rawTags string) error {
+	requested := uniqueStrings(splitCommaValues(rawTags))
+	if len(requested) == 0 {
+		return nil
+	}
+
+	existing, err := c.tagNameLookup()
+	if err != nil {
+		return fmt.Errorf("list tags before create: %w", err)
+	}
+	canonical := make(map[string]struct{}, len(existing))
+	for name := range existing {
+		canonical[strings.ToLower(name)] = struct{}{}
+	}
+
+	for _, name := range requested {
+		key := strings.ToLower(name)
+		if _, ok := canonical[key]; ok {
+			continue
+		}
+		if _, err := c.CreateTag(CreateTagParams{Name: name}); err != nil {
+			return fmt.Errorf("create missing tag %q: %w", name, err)
+		}
+		canonical[key] = struct{}{}
+	}
+	return nil
+}
+
+func (c *Client) loadTagNames() (map[string]struct{}, error) {
+	response, err := c.ListTags(ListTagParams{Limit: 10000})
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[string]struct{}, len(response.Results))
+	for _, tag := range response.Results {
+		names[tag.Name] = struct{}{}
+	}
+	return names, nil
+}
+
+func expectedToDoTitles(params AddToDoParams) ([]string, int) {
+	if strings.TrimSpace(params.Titles) != "" {
+		rawTitles := strings.Split(strings.ReplaceAll(params.Titles, "\r\n", "\n"), "\n")
+		titles := make([]string, 0, len(rawTitles))
+		for _, title := range rawTitles {
+			if title != "" {
+				titles = append(titles, title)
+			}
+		}
+		if len(titles) > 0 {
+			return titles, len(titles)
+		}
+	}
+
+	usesClipboardTitle := strings.EqualFold(strings.TrimSpace(params.UseClipboard), "replace-title")
+	showsQuickEntry := params.ShowQuickEntry != nil && *params.ShowQuickEntry
+	if params.Title != "" && !usesClipboardTitle && !showsQuickEntry {
+		return []string{params.Title}, 1
+	}
+	return nil, 1
+}
+
+func (c *Client) loadTodoIdentities(titles []string) ([]todoIdentity, error) {
+	db, _, err := c.openDB()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	query := `
+SELECT
+  t.uuid,
+  t.title,
+  COALESCE(t.notes, ''),
+  COALESCE(t.project, ''),
+  COALESCE(p.title, ''),
+  COALESCE(t.area, ''),
+  COALESCE(a.title, ''),
+  COALESCE(t.heading, ''),
+  COALESCE(h.title, ''),
+  COALESCE(GROUP_CONCAT(DISTINCT tag.title), '')
+FROM TMTask t
+LEFT JOIN TMTask p ON p.uuid = t.project
+LEFT JOIN TMArea a ON a.uuid = t.area
+LEFT JOIN TMTask h ON h.uuid = t.heading
+LEFT JOIN TMTaskTag tt ON tt.tasks = t.uuid
+LEFT JOIN TMTag tag ON tag.uuid = tt.tags
+WHERE t.type = 0`
+	args := make([]any, 0, len(titles))
+	if len(titles) > 0 {
+		placeholders := make([]string, len(titles))
+		for i, title := range titles {
+			placeholders[i] = "?"
+			args = append(args, title)
+		}
+		query += " AND t.title IN (" + strings.Join(placeholders, ",") + ")"
+	}
+	query += `
+GROUP BY t.uuid, t.title, t.notes, t.project, p.title, t.area, a.title, t.heading, h.title`
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query todo identities: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]todoIdentity, 0)
+	for rows.Next() {
+		var (
+			item    todoIdentity
+			tagsRaw string
+		)
+		if err := rows.Scan(
+			&item.ID,
+			&item.Title,
+			&item.Notes,
+			&item.ProjectID,
+			&item.Project,
+			&item.AreaID,
+			&item.Area,
+			&item.HeadingID,
+			&item.Heading,
+			&tagsRaw,
+		); err != nil {
+			return nil, fmt.Errorf("scan todo identity: %w", err)
+		}
+		item.Tags = splitCommaValues(tagsRaw)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate todo identities: %w", err)
+	}
+	return items, nil
+}
+
+func (c *Client) waitForCreatedToDos(before []todoIdentity, titles []string, expectedCount int, params AddToDoParams) error {
+	var lastLookupErr error
+	for attempt := 0; attempt < toDoCreationPollAttempts; attempt++ {
+		current, err := c.todoIdentityLookup(titles)
+		if err == nil {
+			lastLookupErr = nil
+			if createdToDosConfirmed(before, current, titles, expectedCount, params) {
+				return nil
+			}
+		} else {
+			lastLookupErr = err
+		}
+		if attempt+1 < toDoCreationPollAttempts {
+			c.sleep(toDoCreationPollInterval)
+		}
+	}
+
+	if lastLookupErr != nil {
+		return fmt.Errorf("timed out after 30s; last database read failed: %w", lastLookupErr)
+	}
+	return fmt.Errorf("timed out after 30s")
+}
+
+func createdToDosConfirmed(before []todoIdentity, current []todoIdentity, titles []string, expectedCount int, params AddToDoParams) bool {
+	beforeIDs := make(map[string]struct{}, len(before))
+	for _, item := range before {
+		beforeIDs[item.ID] = struct{}{}
+	}
+
+	created := make([]todoIdentity, 0, len(current))
+	for _, item := range current {
+		if _, existed := beforeIDs[item.ID]; !existed && todoMatchesCreation(item, params) {
+			created = append(created, item)
+		}
+	}
+	if len(titles) == 0 {
+		return len(created) >= expectedCount
+	}
+
+	expectedByTitle := make(map[string]int, len(titles))
+	for _, title := range titles {
+		expectedByTitle[title]++
+	}
+	createdByTitle := make(map[string]int, len(created))
+	for _, item := range created {
+		createdByTitle[item.Title]++
+	}
+	for title, count := range expectedByTitle {
+		if createdByTitle[title] < count {
+			return false
+		}
+	}
+	return true
+}
+
+func todoMatchesCreation(item todoIdentity, params AddToDoParams) bool {
+	clipboardMode := strings.ToLower(strings.TrimSpace(params.UseClipboard))
+	if params.Notes != "" && clipboardMode != "replace-title" && clipboardMode != "replace-notes" && item.Notes != params.Notes {
+		return false
+	}
+
+	if params.ListID != "" {
+		if item.ProjectID != params.ListID && item.AreaID != params.ListID {
+			return false
+		}
+	} else if params.List != "" && item.Project != params.List && item.Area != params.List {
+		return false
+	}
+
+	if params.HeadingID != "" {
+		if item.HeadingID != params.HeadingID {
+			return false
+		}
+	} else if params.Heading != "" && item.Heading != params.Heading {
+		return false
+	}
+
+	for _, expectedTag := range splitCommaValues(params.Tags) {
+		matched := false
+		for _, actualTag := range item.Tags {
+			if strings.EqualFold(actualTag, expectedTag) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *Client) runURLCommand(command string, values url.Values) (*model.URLCommandResult, error) {
 	fullURL := "things:///" + command
-	if encoded := values.Encode(); encoded != "" {
+	if encoded := strings.ReplaceAll(values.Encode(), "+", "%20"); encoded != "" {
 		fullURL += "?" + encoded
 	}
 

@@ -9,13 +9,20 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
 
+type runnerCall struct {
+	name string
+	args []string
+}
+
 type fakeRunner struct {
 	lastName string
 	lastArgs []string
+	calls    []runnerCall
 	output   []byte
 	err      error
 }
@@ -23,6 +30,7 @@ type fakeRunner struct {
 func (r *fakeRunner) Run(name string, args ...string) ([]byte, error) {
 	r.lastName = name
 	r.lastArgs = args
+	r.calls = append(r.calls, runnerCall{name: name, args: append([]string(nil), args...)})
 	return r.output, r.err
 }
 
@@ -148,8 +156,28 @@ func TestAddToDoDispatchesURL(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
+	lookupCount := 0
+	c.todoIdentityLookup = func(_ []string) ([]todoIdentity, error) {
+		lookupCount++
+		if lookupCount == 1 {
+			return nil, nil
+		}
+		return []todoIdentity{{
+			ID:    "todo-1",
+			Title: "Test task",
+			Notes: "notes with spaces",
+			Area:  "Side Projects",
+		}}, nil
+	}
+	c.sleep = func(_ time.Duration) {}
+
 	reveal := true
-	result, err := c.AddToDo(AddToDoParams{Title: "Test task", Reveal: &reveal})
+	result, err := c.AddToDo(AddToDoParams{
+		Title:  "Test task",
+		Notes:  "notes with spaces",
+		List:   "Side Projects",
+		Reveal: &reveal,
+	})
 	if err != nil {
 		t.Fatalf("add todo: %v", err)
 	}
@@ -162,8 +190,138 @@ func TestAddToDoDispatchesURL(t *testing.T) {
 	if len(runner.lastArgs) < 2 {
 		t.Fatalf("unexpected args: %#v", runner.lastArgs)
 	}
-	if !strings.Contains(runner.lastArgs[1], "things:///add?") {
-		t.Fatalf("unexpected URL: %s", runner.lastArgs[1])
+	wantURL := "things:///add?list=Side%20Projects&notes=notes%20with%20spaces&reveal=true&title=Test%20task"
+	if runner.lastArgs[1] != wantURL {
+		t.Fatalf("unexpected URL:\nwant: %s\n got: %s", wantURL, runner.lastArgs[1])
+	}
+}
+
+func TestAddToDoCreatesMissingTagsAndConfirmsPersistence(t *testing.T) {
+	t.Parallel()
+
+	runner := &fakeRunner{}
+	c, err := New(Config{CommandRunner: runner})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	c.tagNameLookup = func() (map[string]struct{}, error) {
+		return map[string]struct{}{"existing": {}}, nil
+	}
+	lookupCount := 0
+	c.todoIdentityLookup = func(titles []string) ([]todoIdentity, error) {
+		lookupCount++
+		if len(titles) != 1 || titles[0] != "Test task" {
+			t.Fatalf("unexpected confirmation titles: %#v", titles)
+		}
+		if lookupCount == 1 {
+			return nil, nil
+		}
+		if lookupCount == 2 {
+			return []todoIdentity{{ID: "todo-1", Title: "Test task"}}, nil
+		}
+		return []todoIdentity{{
+			ID:    "todo-1",
+			Title: "Test task",
+			Notes: "notes with spaces",
+			Area:  "Side Projects",
+			Tags:  []string{"existing", "new tag"},
+		}}, nil
+	}
+	c.sleep = func(_ time.Duration) {}
+
+	result, err := c.AddToDo(AddToDoParams{
+		Title: "Test task",
+		Notes: "notes with spaces",
+		List:  "Side Projects",
+		Tags:  "existing,new tag",
+	})
+	if err != nil {
+		t.Fatalf("add todo: %v", err)
+	}
+	if !result.Dispatched || result.Message != "To-do created and confirmed in Things3." {
+		t.Fatalf("unexpected result: %#v", result)
+	}
+	if lookupCount != 3 {
+		t.Fatalf("expected polling to wait for notes, area, and tags, got %d lookups", lookupCount)
+	}
+	if len(runner.calls) != 2 {
+		t.Fatalf("expected tag creation and URL dispatch, got %#v", runner.calls)
+	}
+	if runner.calls[0].name != "osascript" || !strings.Contains(runner.calls[0].args[1], `make new tag with properties {name:"new tag"}`) {
+		t.Fatalf("unexpected tag creation: %#v", runner.calls[0])
+	}
+	if runner.calls[1].name != "open" || !strings.Contains(runner.calls[1].args[1], "tags=existing%2Cnew%20tag") {
+		t.Fatalf("unexpected URL dispatch: %#v", runner.calls[1])
+	}
+}
+
+func TestAddToDoReturnsErrorWhenPersistenceIsNotConfirmed(t *testing.T) {
+	t.Parallel()
+
+	runner := &fakeRunner{}
+	c, err := New(Config{CommandRunner: runner})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	c.todoIdentityLookup = func(_ []string) ([]todoIdentity, error) { return nil, nil }
+	c.sleep = func(_ time.Duration) {}
+
+	_, err = c.AddToDo(AddToDoParams{Title: "Missing task"})
+	if err == nil || !strings.Contains(err.Error(), "dispatched but to-do creation was not confirmed") {
+		t.Fatalf("expected unconfirmed creation error, got %v", err)
+	}
+	if runner.lastName != "open" {
+		t.Fatalf("expected URL dispatch before confirmation failure, got %s", runner.lastName)
+	}
+}
+
+func TestAddProjectCreatesMissingTags(t *testing.T) {
+	t.Parallel()
+
+	runner := &fakeRunner{}
+	c, err := New(Config{CommandRunner: runner})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	c.tagNameLookup = func() (map[string]struct{}, error) {
+		return map[string]struct{}{}, nil
+	}
+
+	_, err = c.AddProject(AddProjectParams{Title: "Project", Tags: "project tag"})
+	if err != nil {
+		t.Fatalf("add project: %v", err)
+	}
+	if len(runner.calls) != 2 || runner.calls[0].name != "osascript" || runner.calls[1].name != "open" {
+		t.Fatalf("expected tag creation before project dispatch, got %#v", runner.calls)
+	}
+	if !strings.Contains(runner.calls[1].args[1], "tags=project%20tag") {
+		t.Fatalf("unexpected project URL: %s", runner.calls[1].args[1])
+	}
+}
+
+func TestAddProjectPercentEncodesSpaces(t *testing.T) {
+	t.Parallel()
+
+	runner := &fakeRunner{}
+	c, err := New(Config{CommandRunner: runner})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	_, err = c.AddProject(AddProjectParams{
+		Title: "Side project",
+		Notes: "notes with spaces",
+		Area:  "Side Projects",
+	})
+	if err != nil {
+		t.Fatalf("add project: %v", err)
+	}
+
+	got := runner.lastArgs[1]
+	want := "things:///add-project?area=Side%20Projects&notes=notes%20with%20spaces&title=Side%20project"
+	if got != want {
+		t.Fatalf("unexpected URL:\nwant: %s\n got: %s", want, got)
 	}
 }
 
@@ -276,7 +434,8 @@ func TestDeleteProjectByIDUsesSQLiteLookup(t *testing.T) {
 	if runner.lastName != "osascript" {
 		t.Fatalf("expected osascript command, got %s", runner.lastName)
 	}
-	if !strings.Contains(runner.lastArgs[1], "delete project named \"Home\"") {
+	if !strings.Contains(runner.lastArgs[1], "set targetProject to project named \"Home\"") ||
+		!strings.Contains(runner.lastArgs[1], "delete targetProject") {
 		t.Fatalf("unexpected script: %s", runner.lastArgs[1])
 	}
 }
